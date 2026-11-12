@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pıtır'ın Maceraları</title>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: #fff6e5; color: #3d2a70; }
+    main { max-width: 960px; margin: 0 auto; padding: 16px; }
+    h1 { text-align: center; margin: 12px 0; }
+    video { width: 100%; border-radius: 16px; background: #000; display: block; }
+    .bolumler { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 16px; }
+    button { font: inherit; font-weight: 700; color: #fff; border: 0; border-radius: 14px; padding: 12px; cursor: pointer; text-align: left; }
+    button.aktif { outline: 4px solid #3d2a70; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Pıtır'ın Maceraları</h1>
+    <video id="v" src="pitirin-maceralari.mp4" poster="kapak.png" controls playsinline></video>
+    <div class="bolumler" id="b"></div>
+  </main>
+  <script>
+    const bolumler = [
+      ['Günaydın Pıtır!', '#ff9f43'], ['Renkli Balonlar', '#3d9bff'], ['Yağmur ve Gökkuşağı', '#9b5de5'], ['Minik Tohum', '#4cc35b'], ['Elmaları Sayalım', '#f0433a'],
+      ['Ayıcık Nerede?', '#ff6b9d'], ['Meyve Zamanı', '#e09a00'], ['Oyuncakları Toplayalım', '#7d8ff0'], ['Banyo Zamanı', '#27b5d8'], ['İyi Geceler', '#4a4fb0']];
+    const v = document.getElementById('v'), b = document.getElementById('b');
+    const dugmeler = bolumler.map(([ad, renk], i) => {
+      const d = document.createElement('button');
+      d.textContent = (i + 1) + '. Bölüm: ' + ad; d.style.background = renk;
+      d.onclick = () => { v.currentTime = i * 60; v.play(); };
+      b.appendChild(d); return d;
+    });
+    v.ontimeupdate = () => dugmeler.forEach((d, i) => d.classList.toggle('aktif', Math.floor(v.currentTime / 60) === i));
+  </script>
+</body>
+</html>
