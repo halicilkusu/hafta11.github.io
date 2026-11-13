@@ -38,7 +38,10 @@ function heart(c, x, y, s, f) {
   c.fillStyle = f; c.fill();
 }
 const FONT = 'Baloo';
+let DICT = {};
+function setDict(d) { DICT = d; }
 function text(c, s, x, y, size, fill, o = {}) {
+  s = DICT[s] || s;
   c.font = `${size}px ${FONT}`; c.textAlign = o.align || 'center'; c.textBaseline = o.base || 'middle';
   if (o.stroke) { c.lineJoin = 'round'; c.lineWidth = o.sw || size * 0.22; c.strokeStyle = o.stroke; c.strokeText(s, x, y); }
   c.fillStyle = fill; c.fillText(s, x, y);
@@ -250,4 +253,4 @@ function bed(c, x, y, o = {}) { // x: sol, y: zemin
 }
 function blanket(c, x, y, t, col = '#9b8cf2', bump = 1) { const br = Math.sin(t * 1.6) * 4 * bump; c.beginPath(); c.moveTo(x + 150, y - 40); c.lineTo(x + 150, y - 110); c.quadraticCurveTo(x + 260, y - 150 * bump - 10 - br, x + 452, y - 104); c.lineTo(x + 452, y - 40); c.closePath(); c.fillStyle = col; c.fill(); for (let i = 0; i < 5; i++) star(c, x + 200 + i * 52, y - 70 - (i % 2) * 14, 9, '#ffe66d', i); }
 
-module.exports = { W, H, FPS, GY, PI, TAU, clamp, lerp, ease, seg, eseg, pulse, backOut, kf, hop, hops, rnd, mix, circ, ell, rr, line, star, heart, text, sparkle, sparkles, popText, head, pitir, actor, cik, cloud, sun, moon, flower, garden, room, balloon, apple, banana, strawberry, orange, teddy, ball, blocks, car, duck, bubble, zzz, bed, blanket, FONT };
+module.exports = { setDict, W, H, FPS, GY, PI, TAU, clamp, lerp, ease, seg, eseg, pulse, backOut, kf, hop, hops, rnd, mix, circ, ell, rr, line, star, heart, text, sparkle, sparkles, popText, head, pitir, actor, cik, cloud, sun, moon, flower, garden, room, balloon, apple, banana, strawberry, orange, teddy, ball, blocks, car, duck, bubble, zzz, bed, blanket, FONT };

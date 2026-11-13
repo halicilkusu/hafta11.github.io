@@ -64,8 +64,14 @@ def decode(path, tempo=1.0):
     raw = subprocess.run(['ffmpeg', '-v', 'error', '-i', path, '-af', f'atempo={tempo}', '-f', 'f32le', '-ac', '1', '-ar', str(SR), '-'], capture_output=True, check=True).stdout
     x = np.frombuffer(raw, dtype=np.float32); nz = np.where(np.abs(x) > 0.01)[0]
     return x[max(0, nz[0] - 800): nz[-1] + 4000].copy()
+import re
+def clean_en(t):  # İngilizce okumada ses taklitlerini atla
+    for pat, rep_ in [(r'Ring, ring! ', ''), (r' Yum, yum!', ''), (r'Drip, drop! ', ''), (r'Jump, splash! Jump, splash!', "Let's jump in!"), (r'Splish, splash\.\.\. ', ''), (r'Plop! ', ''), (r' Hop, hop, jump, jump!', ''),
+                      (r' Beep beep!', ''), (r'Quack, quack, t', 'T'), (r' Pop, pop, pop!', ''), (r'Shhh!', "Let's be quiet."), (r' Wheee!', ''), (r'Hop, into the box!', 'Into the box it goes!'), (r'^Hop! ', ''), (r'^Splash! ', '')]:
+        t = re.sub(pat, rep_, t)
+    return t
 def say_eleven(text, calm):
-    text = SAY.get(text, text); os.makedirs(CACHE, exist_ok=True)
+    text = clean_en(text) if os.environ.get('PM_LANG') == 'en' else SAY.get(text, text); os.makedirs(CACHE, exist_ok=True)
     f = os.path.join(CACHE, hashlib.md5((ELEVEN + str(calm) + text).encode()).hexdigest() + '.mp3')
     if not os.path.exists(f) or os.path.getsize(f) < 1000:
         body = json.dumps({'text': text, 'model_id': 'eleven_multilingual_v2', 'voice_settings': {'stability': 0.6 if calm else 0.38, 'similarity_boost': 0.75, 'style': 0.15 if calm else 0.45, 'use_speaker_boost': True, 'speed': 0.92 if calm else 1.0}})
@@ -91,8 +97,10 @@ for i, ep in enumerate(caps):
         s = int((i * EP + INTRO + a + 0.25) * SR); sp[s:s + len(x)] += x[: len(sp) - s]
 print('en kötü taşma (sn):', round(worst, 2))
 # konuşma varken müziği kıs (yumuşak geçişli)
-env = np.abs(sp); k = int(0.25 * SR); env = np.convolve((env > 0.01).astype(np.float32), np.ones(k) / k, 'same')
-env = np.convolve(np.minimum(1, env * 3), np.ones(k) / k, 'same')
+def box(v, k):  # hızlı hareketli ortalama
+    cs = np.cumsum(np.concatenate([np.zeros(k // 2 + 1), v.astype(np.float64), np.zeros(k - k // 2)])); return ((cs[k:k + len(v)] - cs[:len(v)]) / k).astype(np.float32)
+env = np.abs(sp); k = int(0.25 * SR); env = box(env > 0.01, k)
+env = box(np.minimum(1, env * 3), k)
 duck = 1 - 0.68 * env
 out = bed * duck[:, None] + sp[:, None] * 0.95
 out = np.tanh(out * 1.05)

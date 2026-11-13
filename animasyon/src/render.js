@@ -10,7 +10,10 @@ const L = require('./lib');
 const EPS = require('./episodes');
 GlobalFonts.registerFromPath(path.join(__dirname, 'Baloo2-ExtraBold.ttf'), L.FONT);
 const { W, H, FPS, clamp, eseg, seg, pulse, backOut, circ, rr, text, star, pitir, cik, rnd, TAU } = L;
-const SERIES = "Pıtır'ın Maceraları";
+const EN = process.env.PM_LANG === 'en' ? require('./en') : null;
+const SERIES = EN ? EN.series : "Pıtır'ın Maceraları";
+const UI = EN ? EN.ui : { episodeUpper: n => n + '. BÖLÜM', badge: (n, t) => `${n}. Bölüm  •  ${t}`, done: 'Aferin!', doneSize: 62, end: 'SON', bye: 'Görüşmek üzere, hoşça kalın!', finished: n => `${n}. bölüm bitti` };
+if (EN) { L.setDict(EN.dict); EPS.forEach((e, i) => { e.title = EN.titles[i]; e.caps = e.caps.map((cp, k) => [cp[0], cp[1], EN.caps[i][k]]); }); }
 const INTRO = 5, STORY_END = 57, EP_LEN = 60;
 
 function titleCard(c, ep, n, te) {
@@ -24,7 +27,7 @@ function titleCard(c, ep, n, te) {
   c.save(); c.translate(W / 2, 250); c.scale(k, k); circ(c, 0, 0, 96, '#fff'); circ(c, 0, 0, 82, '#ffd23f');
   text(c, String(n), 0, 8, 120, '#fff', { stroke: '#e58a00', sw: 14 }); c.restore();
   const k2 = backOut(seg(te, 0.8, 1.4));
-  c.save(); c.translate(W / 2, 400); c.scale(k2, k2); text(c, n + '. BÖLÜM', 0, 0, 44, '#fff', { stroke: 'rgba(0,0,0,.2)', sw: 9 }); c.restore();
+  c.save(); c.translate(W / 2, 400); c.scale(k2, k2); text(c, UI.episodeUpper(n), 0, 0, 44, '#fff', { stroke: 'rgba(0,0,0,.2)', sw: 9 }); c.restore();
   const k3 = backOut(seg(te, 1.2, 1.9));
   c.font = `84px ${L.FONT}`; const ts = Math.min(84, 84 * 720 / c.measureText(ep.title).width);
   c.save(); c.translate(W / 2 + 30, 490); c.scale(k3, k3); text(c, ep.title, 0, 0, ts, '#fff', { stroke: '#3d2a70', sw: 18 }); c.restore();
@@ -45,7 +48,7 @@ function caption(c, ep, t) {
   }
 }
 function badge(c, ep, n) {
-  c.font = `26px ${L.FONT}`; const s = `${n}. Bölüm  •  ${ep.title}`, w = c.measureText(s).width;
+  c.font = `26px ${L.FONT}`; const s = UI.badge(n, ep.title), w = c.measureText(s).width;
   rr(c, 22, 20, w + 44, 48, 24, ep.color); c.lineWidth = 4; c.strokeStyle = '#fff'; c.stroke();
   text(c, s, 44, 46, 26, '#fff', { align: 'left' });
 }
@@ -61,7 +64,7 @@ function frameV(c, sc, scCanvas, n, te) {
   c.restore();
   for (let i = 0; i < 18; i++) star(c, rnd(i + n) * VW, ((rnd(i + 20) * VH + te * 40 * (0.5 + rnd(i))) % (VH + 40)) - 20, 12 + rnd(i + 4) * 16, 'rgba(255,255,255,.45)', te * 0.6 + i);
   text(c, SERIES, VW / 2, 210, 76, '#fff', { stroke: '#3d2a70', sw: 18 });
-  c.font = `50px ${L.FONT}`; const bs = `${n}. Bölüm  •  ${ep.title}`, bw = Math.min(980, c.measureText(bs).width + 80), fs = Math.min(50, 50 * 900 / c.measureText(bs).width);
+  c.font = `50px ${L.FONT}`; const bs = UI.badge(n, ep.title), bw = Math.min(980, c.measureText(bs).width + 80), fs = Math.min(50, 50 * 900 / c.measureText(bs).width);
   rr(c, VW / 2 - bw / 2, 300, bw, 88, 44, '#fff'); text(c, bs, VW / 2, 347, fs, ep.color === '#ffb400' ? '#c98400' : ep.color);
   const SX = 24, SY = 450, SW2 = VW - 48, SH2 = SW2 * H / W;
   rr(c, SX - 12, SY - 12, SW2 + 24, SH2 + 24, 40, '#fff');
@@ -99,8 +102,8 @@ function frame(c, n, te) {
     if (k > 0) {
       c.save(); c.translate(W / 2, H / 2); c.scale(k, k);
       star(c, 0, -20, 190, '#ffd23f', Math.sin(te * 2) * 0.1); star(c, 0, -20, 150, '#ffe98a', Math.sin(te * 2) * 0.1);
-      text(c, n === EPS.length ? 'SON' : 'Aferin!', 0, -12, n === EPS.length ? 80 : 62, '#fff', { stroke: '#e58a00', sw: 14 });
-      text(c, n === EPS.length ? 'Görüşmek üzere, hoşça kalın!' : `${n}. bölüm bitti`, 0, 220, 44, '#fff', { stroke: 'rgba(0,0,0,.2)', sw: 9 });
+      text(c, n === EPS.length ? UI.end : UI.done, 0, -12, n === EPS.length ? (EN ? 52 : 80) : UI.doneSize, '#fff', { stroke: '#e58a00', sw: 14 });
+      text(c, n === EPS.length ? UI.bye : UI.finished(n), 0, 220, 44, '#fff', { stroke: 'rgba(0,0,0,.2)', sw: 9 });
       c.restore();
     }
     const fo = eseg(te, EP_LEN - 0.35, EP_LEN); if (fo > 0) { c.globalAlpha = fo; c.fillStyle = '#fff'; c.fillRect(0, 0, W, H); c.globalAlpha = 1; }
@@ -109,6 +112,7 @@ function frame(c, n, te) {
 
 async function main() {
   const [mode, a, b, d] = process.argv.slice(2);
+  if (mode === 'caps') { fs.writeFileSync(a, JSON.stringify(EPS.map(e => e.caps))); return; }
   if (mode === 'events') {
     fs.writeFileSync(a, JSON.stringify(EPS.map(e => ({ title: e.title, music: e.music, sfx: e.sfx || [] })), null, 1)); return;
   }
