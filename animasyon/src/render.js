@@ -1,6 +1,7 @@
 // Kullanım:
 //   node render.js ep <n> <cikti.mp4>      -> n. bölümü (60 sn) işler
 //   node render.js png <n> <saniye> <cikti.png>
+//   node render.js short <n> <cikti.mp4>   -> n. bölümün dikey (9:16) sürümü
 //   node render.js events <cikti.json>     -> ses efektleri zaman çizelgesi
 const { createCanvas, GlobalFonts } = require('@napi-rs/canvas');
 const { spawn } = require('child_process');
@@ -48,6 +49,34 @@ function badge(c, ep, n) {
   rr(c, 22, 20, w + 44, 48, 24, ep.color); c.lineWidth = 4; c.strokeStyle = '#fff'; c.stroke();
   text(c, s, 44, 46, 26, '#fff', { align: 'left' });
 }
+let VERT = false;
+// Dikey (9:16, Shorts) kare: sahne ortada, altyazı büyük puntoyla altında
+const VW = 1080, VH = 1920;
+function wrap(c, s, maxW) { const out = []; let cur = ''; for (const w of s.split(' ')) { const t = cur ? cur + ' ' + w : w; if (c.measureText(t).width > maxW && cur) { out.push(cur); cur = w; } else cur = t; } out.push(cur); return out; }
+function frameV(c, sc, scCanvas, n, te) {
+  const ep = EPS[n - 1]; frame(sc, n, te);
+  c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.fillStyle = ep.color; c.fillRect(0, 0, VW, VH);
+  c.save(); c.translate(VW / 2, 700); c.rotate(te * 0.08); c.globalAlpha = 0.12; c.fillStyle = '#fff';
+  for (let i = 0; i < 12; i++) { c.rotate(TAU / 12); c.beginPath(); c.moveTo(0, 0); c.lineTo(1800, -230); c.lineTo(1800, 230); c.fill(); }
+  c.restore();
+  for (let i = 0; i < 18; i++) star(c, rnd(i + n) * VW, ((rnd(i + 20) * VH + te * 40 * (0.5 + rnd(i))) % (VH + 40)) - 20, 12 + rnd(i + 4) * 16, 'rgba(255,255,255,.45)', te * 0.6 + i);
+  text(c, SERIES, VW / 2, 210, 76, '#fff', { stroke: '#3d2a70', sw: 18 });
+  c.font = `50px ${L.FONT}`; const bs = `${n}. Bölüm  •  ${ep.title}`, bw = Math.min(980, c.measureText(bs).width + 80), fs = Math.min(50, 50 * 900 / c.measureText(bs).width);
+  rr(c, VW / 2 - bw / 2, 300, bw, 88, 44, '#fff'); text(c, bs, VW / 2, 347, fs, ep.color === '#ffb400' ? '#c98400' : ep.color);
+  const SX = 24, SY = 450, SW2 = VW - 48, SH2 = SW2 * H / W;
+  rr(c, SX - 12, SY - 12, SW2 + 24, SH2 + 24, 40, '#fff');
+  c.save(); c.beginPath(); c.roundRect(SX, SY, SW2, SH2, 30); c.clip(); c.drawImage(scCanvas, SX, SY, SW2, SH2); c.restore();
+  const t = te - INTRO, CY = SY + SH2 + 60;
+  if (te >= INTRO && te < STORY_END) for (const [a, b, s] of ep.caps) {
+    if (t < a || t > b) continue;
+    const al = pulse(t, a, b, 0.3); c.save(); c.globalAlpha = al; c.font = `62px ${L.FONT}`;
+    const lines = wrap(c, s, 900), bh = lines.length * 80 + 70;
+    rr(c, 50, CY + (1 - al) * 20, VW - 100, bh, 50, 'rgba(255,255,255,.96)');
+    lines.forEach((ln, i) => text(c, ln, VW / 2, CY + (1 - al) * 20 + 78 + i * 80, 62, '#3d2a70')); c.restore();
+  }
+  pitir(c, { x: 330, y: 1790, s: 1.25, t: te, mood: 'joy', armR: 2.5 + Math.sin(te * 8) * 0.3, armL: 0.5, jump: L.hops(te % 6, [1, 1.7], 0.5, 50) });
+  cik(c, 790, 1780 + L.hops(te % 4, [0.5, 1.1, 2.6], 0.35, 40), te, { s: 2.4, face: -1, flap: (te % 4) < 1.6 ? 1 : 0 });
+}
 function frame(c, n, te) {
   const ep = EPS[n - 1];
   c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1;
@@ -58,8 +87,8 @@ function frame(c, n, te) {
   }
   const t = te - INTRO;
   c.save(); ep.draw(c, t); c.restore(); c.globalAlpha = 1;
-  if (te < STORY_END) caption(c, ep, t);
-  badge(c, ep, n);
+  if (te < STORY_END && !VERT) caption(c, ep, t);
+  if (!VERT) badge(c, ep, n);
   const fin = 1 - eseg(te, INTRO, INTRO + 0.5); // başlangıçta beyazdan aç
   if (fin > 0) { c.globalAlpha = fin; c.fillStyle = ep.color; c.fillRect(0, 0, W, H); c.globalAlpha = 1; }
   if (te >= STORY_END) { // iris kapanışı + bölüm sonu kartı
@@ -82,6 +111,14 @@ async function main() {
   const [mode, a, b, d] = process.argv.slice(2);
   if (mode === 'events') {
     fs.writeFileSync(a, JSON.stringify(EPS.map(e => ({ title: e.title, music: e.music, sfx: e.sfx || [] })), null, 1)); return;
+  }
+  if (mode === 'short' || mode === 'shortpng') {
+    VERT = true; const sc = createCanvas(W, H), cv = createCanvas(VW, VH), c = cv.getContext('2d'), scx = sc.getContext('2d');
+    if (mode === 'shortpng') { frameV(c, scx, sc, +a, +b); fs.writeFileSync(d, cv.toBuffer('image/png')); return; }
+    const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${VW}x${VH}`, '-r', String(FPS), '-i', '-',
+      '-c:v', 'libx264', '-preset', 'medium', '-crf', '21', '-pix_fmt', 'yuv420p', '-g', '60', b], { stdio: ['pipe', 'inherit', 'inherit'] });
+    for (let i = 0; i < EP_LEN * FPS; i++) { frameV(c, scx, sc, +a, i / FPS); if (!ff.stdin.write(cv.data())) await new Promise(r => ff.stdin.once('drain', r)); }
+    ff.stdin.end(); await new Promise(r => ff.on('close', r)); return;
   }
   const canvas = createCanvas(W, H), c = canvas.getContext('2d');
   if (mode === 'png') { frame(c, +a, +b); fs.writeFileSync(d, canvas.toBuffer('image/png')); return; }
