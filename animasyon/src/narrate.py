@@ -57,13 +57,35 @@ def say(text, scale, calm=False):
     x = lively(x, sr, 1.15 if calm else 1.6, 1.0 if calm else 1.06)
     return np.interp(np.arange(int(len(x) * SR / sr)) * sr / SR, np.arange(len(x)), x).astype(np.float32)
 
+import subprocess, hashlib, os
+ELEVEN = os.environ.get('ELEVEN_VOICE')   # ElevenLabs ses kimliği verilirse o kullanılır (anahtar ortamdan gelir, koda yazılmaz)
+CACHE = os.environ.get('ELEVEN_CACHE', 'eleven_cache')
+def decode(path, tempo=1.0):
+    raw = subprocess.run(['ffmpeg', '-v', 'error', '-i', path, '-af', f'atempo={tempo}', '-f', 'f32le', '-ac', '1', '-ar', str(SR), '-'], capture_output=True, check=True).stdout
+    x = np.frombuffer(raw, dtype=np.float32); nz = np.where(np.abs(x) > 0.01)[0]
+    return x[max(0, nz[0] - 800): nz[-1] + 4000].copy()
+def say_eleven(text, calm):
+    text = SAY.get(text, text); os.makedirs(CACHE, exist_ok=True)
+    f = os.path.join(CACHE, hashlib.md5((ELEVEN + str(calm) + text).encode()).hexdigest() + '.mp3')
+    if not os.path.exists(f) or os.path.getsize(f) < 1000:
+        body = json.dumps({'text': text, 'model_id': 'eleven_multilingual_v2', 'voice_settings': {'stability': 0.6 if calm else 0.38, 'similarity_boost': 0.75, 'style': 0.15 if calm else 0.45, 'use_speaker_boost': True, 'speed': 0.92 if calm else 1.0}})
+        r = subprocess.run(['curl', '-sS', '-m', '90', '-o', f, '-w', '%{http_code}', '-H', 'Content-Type: application/json', '-d', body,
+                            f'https://api.elevenlabs.io/v1/text-to-speech/{ELEVEN}?output_format=mp3_44100_128'], capture_output=True, text=True)
+        if r.stdout.strip() != '200':
+            msg = open(f).read()[:300]; os.remove(f); raise SystemExit(f'ElevenLabs hata {r.stdout}: {msg}')
+    return f
+
 sp = np.zeros(len(bed), dtype=np.float32); worst = 0
 for i, ep in enumerate(caps):
     for k, (a, b, text) in enumerate(ep):
         limit = (ep[k + 1][0] if k + 1 < len(ep) else 52.5) - a - 0.35
         calm = i == len(caps) - 1; base = 1.18 if calm else 1.04
-        x = say(text, base, calm)
-        if len(x) / SR > limit: x = say(text, max(0.85, base * limit / (len(x) / SR) * 0.98), calm)
+        if ELEVEN:
+            f = say_eleven(text, calm); x = decode(f)
+            if len(x) / SR > limit: x = decode(f, min(1.3, len(x) / SR / limit * 1.02))
+        else:
+            x = say(text, base, calm)
+            if len(x) / SR > limit: x = say(text, max(0.85, base * limit / (len(x) / SR) * 0.98), calm)
         worst = max(worst, len(x) / SR - limit)
         x = x / max(0.05, np.abs(x).max()) * 0.8
         s = int((i * EP + INTRO + a + 0.25) * SR); sp[s:s + len(x)] += x[: len(sp) - s]
