@@ -121,7 +121,8 @@ async function main() {
     if (mode === 'shortpng') { frameV(c, scx, sc, +a, +b); fs.writeFileSync(d, cv.toBuffer('image/png')); return; }
     const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${VW}x${VH}`, '-r', String(FPS), '-i', '-',
       '-c:v', 'libx264', '-preset', 'medium', '-crf', '21', '-pix_fmt', 'yuv420p', '-g', '60', b], { stdio: ['pipe', 'inherit', 'inherit'] });
-    for (let i = 0; i < EP_LEN * FPS; i++) { frameV(c, scx, sc, +a, i / FPS); if (!ff.stdin.write(cv.data())) await new Promise(r => ff.stdin.once('drain', r)); }
+    const SKIP = 3.5; // Shorts: başlık kartı 1,5 sn sürer (ilk 3,5 sn atlanır)
+    for (let i = 0; i < (EP_LEN - SKIP) * FPS; i++) { frameV(c, scx, sc, +a, i / FPS + SKIP); if (!ff.stdin.write(cv.data())) await new Promise(r => ff.stdin.once('drain', r)); }
     ff.stdin.end(); await new Promise(r => ff.on('close', r)); return;
   }
   const canvas = createCanvas(W, H), c = canvas.getContext('2d');
